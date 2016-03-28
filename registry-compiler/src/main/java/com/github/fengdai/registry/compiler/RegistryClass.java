@@ -3,6 +3,7 @@ package com.github.fengdai.registry.compiler;
 import com.github.fengdai.registry.internal.Model;
 import com.github.fengdai.registry.internal.RegistryImpl;
 import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
@@ -13,7 +14,9 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.TypeElement;
 
 final class RegistryClass {
   private static final ClassName REGISTRY_IMPL = ClassName.get(RegistryImpl.class);
@@ -37,8 +40,8 @@ final class RegistryClass {
     TypeSpec.Builder result =
         TypeSpec.classBuilder(className).addModifiers(Modifier.PUBLIC).superclass(REGISTRY_IMPL);
     result.addMethod(constructor());
-    addCreateModelMethods(result);
     result.addMethod(createModelsMethod());
+    addCreateModelMethods(result);
     return JavaFile.builder(classPackage, result.build())
         .addFileComment("Generated code from Registry. Do not modify!")
         .build();
@@ -65,23 +68,44 @@ final class RegistryClass {
 
   private MethodSpec createToOneModelMethod(ToOneBinding binding) {
     MethodSpec.Builder result = buildCreateModelMethod(binding);
-    result.addStatement("$T<$T> builder = Model.oneToOne($T.class)", Model.Builder.class,
-        ClassName.get(binding.getModelType()), ClassName.get(binding.getModelType()));
+    CodeBlock.Builder codeBlockBuilder = CodeBlock.builder()
+        .add("return Model.oneToOne($T.class)\n", ClassName.get(binding.getModelType()));
     ItemViewClass itemViewClass = binding.getItemViewClass();
-    addItemView(itemViewClass, result);
-    result.addStatement("return builder.build()");
+    if (itemViewClass.isViewLayoutRes()) {
+      codeBlockBuilder.add("    .add($L, $T.class, $L)\n", itemViewClass.getType(),
+          ClassName.get(itemViewClass.getBinderType()), itemViewClass.getLayoutRes());
+    } else {
+      codeBlockBuilder.add("    .add($L, $T.class, $T.class)\n", itemViewClass.getType(),
+          ClassName.get(itemViewClass.getBinderType()),
+          ClassName.get(itemViewClass.getViewProviderType()));
+    }
+    codeBlockBuilder.add("    .build();\n");
+    result.addCode(codeBlockBuilder.build());
     return result.build();
   }
 
   private MethodSpec createToManyModelMethod(ToManyBinding binding) {
     MethodSpec.Builder result = buildCreateModelMethod(binding);
-    result.addStatement("$T<$T> builder = Model.oneToMany($T.class, $T.class)", Model.Builder.class,
-        ClassName.get(binding.getModelType()), ClassName.get(binding.getModelType()),
-        ClassName.get(binding.getMapperType()));
-    for (ItemViewClass itemViewClass : binding.getItemViewClasses()) {
-      addItemView(itemViewClass, result);
+    CodeBlock.Builder codeBlockBuilder = CodeBlock.builder()
+        .add("return Model.oneToMany($T.class, $T.class)\n", ClassName.get(binding.getModelType()),
+            ClassName.get(binding.getMapperType()));
+    Set<Map.Entry<Object, ItemViewClass>> entrySet = binding.getItemViewClassMap().entrySet();
+    for (Map.Entry<Object, ItemViewClass> entry : entrySet) {
+      Object key = entry.getKey();
+      ItemViewClass itemViewClass = entry.getValue();
+      if (itemViewClass.isViewLayoutRes()) {
+        codeBlockBuilder.add("    .add($T.class, $L, $T.class, $L)\n",
+            ClassName.get((TypeElement) key), itemViewClass.getType(),
+            ClassName.get(itemViewClass.getBinderType()), itemViewClass.getLayoutRes());
+      } else {
+        codeBlockBuilder.add("    .add($T.class, $L, $T.class, $T.class)\n",
+            ClassName.get((TypeElement) key), itemViewClass.getType(),
+            ClassName.get(itemViewClass.getBinderType()),
+            ClassName.get(itemViewClass.getViewProviderType()));
+      }
     }
-    result.addStatement("return builder.build()");
+    codeBlockBuilder.add("    .build();\n");
+    result.addCode(codeBlockBuilder.build());
     return result.build();
   }
 
@@ -90,17 +114,6 @@ final class RegistryClass {
         .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
         .returns(ParameterizedTypeName.get(ClassName.get(Model.class),
             ClassName.get(binding.getModelType())));
-  }
-
-  private void addItemView(ItemViewClass itemViewClass, MethodSpec.Builder result) {
-    if (itemViewClass.isViewLayoutRes()) {
-      result.addStatement("builder.add($L, $T.class, $L)", itemViewClass.getType(),
-          ClassName.get(itemViewClass.getBinderType()), itemViewClass.getLayoutRes());
-    } else {
-      result.addStatement("builder.add($L, $T.class, $T.class)", itemViewClass.getType(),
-          ClassName.get(itemViewClass.getBinderType()),
-          ClassName.get(itemViewClass.getViewProviderType()));
-    }
   }
 
   private MethodSpec createModelsMethod() {

@@ -1,5 +1,6 @@
 package com.github.fengdai.registry.sample;
 
+import com.github.fengdai.registry.ViewBinder;
 import com.github.fengdai.registry.internal.Model;
 import com.github.fengdai.registry.internal.RegistryImpl;
 import com.github.fengdai.registry.sample.binder.BarIconAndText;
@@ -23,15 +24,16 @@ public class TextList$$Registry extends RegistryImpl {
   }
 
   private static Model<Foo> com_github_fengdai_registry_internal_model_Foo() {
-    Model.Builder<Foo> builder = Model.oneToOne(Foo.class);
-    builder.add(0, FooBinder.class, android.R.layout.simple_list_item_1);
-    return builder.build();
+    return Model.oneToOne(Foo.class)
+        .add(0, FooBinder.class, android.R.layout.simple_list_item_1)
+        .build();
   }
 
   private static Model<Bar> com_github_fengdai_registry_internal_model_Bar() {
-    Model.Builder<Bar> builder = Model.oneToMany(Bar.class, TextList.BarMapper.class);
-    builder.add(1, BarIconAndText.class, android.R.layout.activity_list_item);
-    builder.add(2, BarTextOnly.class, android.R.layout.simple_list_item_1);
+    Model.ToManyBuilder<Bar, Class<? extends ViewBinder<Bar, ?>>> builder =
+        Model.oneToMany(Bar.class, TextList.BarMapper.class);
+    builder.add(BarIconAndText.class, 1, BarIconAndText.class, android.R.layout.activity_list_item);
+    builder.add(BarIconAndText.class, 2, BarTextOnly.class, android.R.layout.simple_list_item_1);
     return builder.build();
   }
 }

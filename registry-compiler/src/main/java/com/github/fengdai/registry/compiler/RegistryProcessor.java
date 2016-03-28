@@ -115,7 +115,7 @@ public class RegistryProcessor extends AbstractProcessor {
         bindingMap.put(modelType, binding);
       } else {
         ToManyBinding toManyBinding = new ToManyBinding(modelType, mapperType);
-        toManyBinding.add(itemViewClass);
+        toManyBinding.add(binderElement, itemViewClass);
         bindingMap.put(modelType, toManyBinding);
       }
     } else {
@@ -125,7 +125,7 @@ public class RegistryProcessor extends AbstractProcessor {
         return;
       }
       ToManyBinding toManyBinding = (ToManyBinding) binding;
-      toManyBinding.add(itemViewClass);
+      toManyBinding.add(binderElement, itemViewClass);
     }
   }
 
@@ -219,11 +219,6 @@ public class RegistryProcessor extends AbstractProcessor {
 
   private String getPackageName(TypeElement type) {
     return elementUtils.getPackageOf(type).getQualifiedName().toString();
-  }
-
-  private String getFqcn(TypeElement typeElement) {
-    String packageName = getPackageName(typeElement);
-    return packageName + "." + getClassName(typeElement, packageName);
   }
 
   private static String getClassName(TypeElement type, String packageName) {
